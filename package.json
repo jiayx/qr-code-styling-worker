@@ -42,7 +42,7 @@
     "build": "tsc -p tsconfig.build.json",
     "prepare": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "oxlint src test examples --deny-warnings --deny typescript/no-floating-promises",
+    "lint": "oxlint src test examples scripts --deny-warnings --deny typescript/no-floating-promises",
     "test": "vitest run",
     "pack:check": "npm pack --dry-run --ignore-scripts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm pack:check"
