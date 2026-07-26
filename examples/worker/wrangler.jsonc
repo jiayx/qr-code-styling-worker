@@ -1,0 +1,14 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "qr-code-styling-worker-example",
+  "main": "index.ts",
+  "compatibility_date": "2026-07-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "images": {
+    "binding": "IMAGES",
+    "remote": true
+  },
+  "observability": {
+    "enabled": true
+  }
+}

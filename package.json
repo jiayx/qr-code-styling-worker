@@ -1,0 +1,70 @@
+{
+  "name": "qr-code-styling-worker",
+  "version": "0.1.0",
+  "description": "Cloudflare Workers runtime adapters for qr-code-styling",
+  "type": "module",
+  "license": "MIT",
+  "author": "jiayx",
+  "homepage": "https://github.com/jiayx/qr-code-styling-worker#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jiayx/qr-code-styling-worker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jiayx/qr-code-styling-worker/issues"
+  },
+  "keywords": [
+    "qr-code",
+    "qr-code-styling",
+    "cloudflare-workers",
+    "svg",
+    "png",
+    "jpeg",
+    "webp"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "oxlint src test examples --deny-warnings --deny typescript/no-floating-promises",
+    "test": "vitest run",
+    "pack:check": "npm pack --dry-run --ignore-scripts",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm pack:check"
+  },
+  "dependencies": {
+    "linkedom": "0.18.13",
+    "qr-code-styling": "1.9.2"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.18.8",
+    "@cloudflare/workers-types": "5.20260726.1",
+    "@types/node": "24.10.4",
+    "oxlint": "1.75.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "wrangler": "4.114.0"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "packageManager": "pnpm@11.17.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}
