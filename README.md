@@ -188,45 +188,6 @@ pnpm check
 
 Tests run with `@cloudflare/vitest-pool-workers`, not a Node-only DOM shim.
 
-## Releasing
-
-The package version, Git tag, GitHub Release, and npm version must match:
-
-| Artifact | Example |
-| --- | --- |
-| `package.json` | `0.1.0` |
-| Git tag | `v0.1.0` |
-| GitHub Release | `v0.1.0` |
-| npm | `qr-code-styling-worker@0.1.0` |
-
-Pushing a `v*` tag starts the publish workflow. It verifies that the tag is
-exactly `v${package.json.version}`, runs the complete check suite, publishes
-the package to npm, and creates the same GitHub Release only after npm succeeds.
-Rerunning the workflow is safe: an existing npm version or GitHub Release is
-detected and skipped.
-
-The npm Trusted Publisher is scoped to:
-
-```text
-GitHub owner: jiayx
-Repository: qr-code-styling-worker
-Workflow: publish.yml
-Environment: npm
-Allowed action: npm publish
-```
-
-Releases use short-lived OIDC credentials and require no `NPM_TOKEN`. Create
-subsequent releases from a clean `main` branch:
-
-```sh
-pnpm version patch
-git push origin main --follow-tags
-```
-
-Use `minor`, `major`, or an explicit version instead of `patch` when
-appropriate. Do not create the GitHub Release manually; the publish workflow
-creates it after the matching npm package is available.
-
 ## License
 
 MIT. `qr-code-styling` and `linkedom` remain separate dependencies under their
