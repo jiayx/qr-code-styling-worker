@@ -151,8 +151,20 @@ const qr = new QRCodeStyling({ data, image, jsdom, nodeCanvas });
 
 ## Compatibility notes
 
-The rendering API is intentionally kept compatible with upstream. Two
-environment-specific behaviors are explicit:
+The package and its upstream dependency use independent semantic versioning:
+
+| qr-code-styling-worker | qr-code-styling | Status |
+| --- | --- | --- |
+| 0.1.x | 1.9.2 | Fully tested |
+
+`qr-code-styling` is pinned to an exact version because the Worker adapters use
+some upstream internal rendering interfaces. Upstream versions are upgraded
+only after the complete workerd compatibility test suite passes. A
+`qr-code-styling-worker` version therefore does not correspond directly to an
+upstream `qr-code-styling` version.
+
+The rendering API is intentionally kept compatible with the tested upstream
+version. Two environment-specific behaviors are explicit:
 
 - `download()` cannot initiate a browser download in a Worker. Use
   `getRawData()` and return the Blob in a `Response`.
