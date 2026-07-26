@@ -20,11 +20,14 @@ Canvas dependencies are replaced with Worker-safe adapters.
 ## Install
 
 ```sh
-pnpm add github:jiayx/qr-code-styling-worker
+pnpm add qr-code-styling-worker
 ```
 
-After the package is published to npm, `pnpm add qr-code-styling-worker` will
-install the same public package.
+Or with npm:
+
+```sh
+npm install qr-code-styling-worker
+```
 
 ## SVG in a Worker
 
@@ -202,8 +205,7 @@ the package to npm, and creates the same GitHub Release only after npm succeeds.
 Rerunning the workflow is safe: an existing npm version or GitHub Release is
 detected and skipped.
 
-For the first release, publish `0.1.0` manually from a clean `main` checkout,
-then configure npm Trusted Publishing for:
+The npm Trusted Publisher is scoped to:
 
 ```text
 GitHub owner: jiayx
@@ -213,8 +215,8 @@ Environment: npm
 Allowed action: npm publish
 ```
 
-After that, releases use short-lived OIDC credentials and require no
-`NPM_TOKEN`. Create subsequent releases from a clean `main` branch:
+Releases use short-lived OIDC credentials and require no `NPM_TOKEN`. Create
+subsequent releases from a clean `main` branch:
 
 ```sh
 pnpm version patch
