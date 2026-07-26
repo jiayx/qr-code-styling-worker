@@ -16,7 +16,6 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "examples/**/*.ts",
-    "vitest.config.ts",
-    "worker-configuration.d.ts"
+    "vitest.config.ts"
   ]
 }

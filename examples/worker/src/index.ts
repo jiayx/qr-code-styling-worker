@@ -1,6 +1,6 @@
 import QRCodeStyling, {
   createCloudflareCanvas,
-} from "../../src/index.js";
+} from "../../../src/index.js";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
