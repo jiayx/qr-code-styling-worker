@@ -1,6 +1,6 @@
 {
   "name": "qr-code-styling-worker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cloudflare Workers runtime adapters for qr-code-styling",
   "type": "module",
   "license": "MIT",
