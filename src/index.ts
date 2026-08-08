@@ -122,7 +122,7 @@ export default class QRCodeStyling extends BaseQRCodeStyling {
       const seamOverlap = upstreamOptions.dotsOptions?.roundSize === false
         ? this.#seamOverlap
         : 0;
-      applySvgRenderingFixes(svg, seamOverlap);
+      applySvgRenderingFixes(svg, seamOverlap, this._qr, upstreamOptions);
       this.#userExtension?.(svg, upstreamOptions);
     };
   }

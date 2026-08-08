@@ -24,7 +24,7 @@ describe("SVG rendering in workerd", () => {
     );
   });
 
-  it("overlaps fractional clip paths without rounding module size", async () => {
+  it("bridges adjacent modules without expanding the painted layer", async () => {
     const qr = new QRCodeStyling({
       data: "https://tools.tf",
       height: 320,
@@ -40,9 +40,10 @@ describe("SVG rendering in workerd", () => {
     const svg = await qr.getSvgString();
 
     expect(svg).toContain('data-qr-seam-overlap="0.2"');
-    expect(svg.match(/data-qr-seam-copy=/g)).toHaveLength(4);
-    expect(svg).toContain('transform="translate(-0.2 0)"');
-    expect(svg).toContain('transform="translate(0 0.2)"');
+    expect(svg).toContain('data-qr-seam-bridge="vertical"');
+    expect(svg).toContain('data-qr-seam-bridge="horizontal"');
+    expect(svg).not.toContain("data-qr-seam-copy");
+    expect(svg).not.toContain("translate(-0.2 0)");
     expect(svg).not.toContain('stroke-width="0.4"');
     expect(svg).toContain('viewBox="0 0 320 320"');
     expect(svg).not.toMatch(/\d+\.\d{7,}/);
@@ -65,6 +66,32 @@ describe("SVG rendering in workerd", () => {
     });
 
     expect(await qr.getSvgString()).not.toContain("data-qr-seam-overlap");
+  });
+
+  it("does not connect intentionally separate dots", async () => {
+    const dots = new QRCodeStyling({
+      data: "separate-dots",
+      dotsOptions: { roundSize: false, type: "dots" },
+      svgOptions: { seamOverlap: 0.2 },
+      type: "svg",
+    });
+    expect(await dots.getSvgString()).not.toContain("data-qr-seam-bridge");
+  });
+
+  it("bridges visible modules around an embedded logo", async () => {
+    const qr = new QRCodeStyling({
+      data: "logo-safe",
+      dotsOptions: { roundSize: false, type: "rounded" },
+      image: logo,
+      imageOptions: { hideBackgroundDots: true, imageSize: 0.3, margin: 2 },
+      svgOptions: { seamOverlap: 0.2 },
+      type: "svg",
+    });
+    const svg = await qr.getSvgString();
+
+    expect(svg).toContain("<image");
+    expect(svg).toContain('data-qr-seam-bridge="vertical"');
+    expect(svg).toContain('data-qr-seam-bridge="horizontal"');
   });
 
   it("validates and updates seam overlap", async () => {

@@ -34,7 +34,7 @@ It does not maintain a separate QR encoder or a divergent figure renderer.
 | Image metadata | Reads dimensions from SVG, PNG, JPEG, GIF, and WebP sources and converts loaded bytes to data URLs | Upstream image sizing and self-contained SVG logo embedding continue to work in a Worker |
 | Raster output | Implements the minimal canvas surface used by upstream and delegates encoding to a Cloudflare Images binding | PNG, JPEG, and WebP are available without native `canvas` dependencies |
 | Standalone SVG | Adds the default SVG namespace before serialization | Opening an `/image` response directly renders an image instead of exposing XML text |
-| Fractional modules | Optionally overlaps the final painted dots layer when `roundSize` is disabled | Browser anti-aliasing seams are suppressed without changing the SVG size, view box, or margin calculation |
+| Fractional modules | Optionally bridges only shared edges between adjacent dark modules when `roundSize` is disabled | Browser anti-aliasing seams are suppressed without expanding outer contours or changing margins |
 | SVG serialization | Normalizes known geometry attributes to at most six decimal places | Binary floating-point artifacts are removed and SVG output is smaller and easier to diff |
 | Extension hooks | Composes the internal SVG fixes with upstream `applyExtension()` and `deleteExtension()` | Application extensions remain usable without disabling the port fixes |
 | Failure propagation | Records asynchronous DOM/canvas adapter failures and throws them from `getRawData()` | Fetch, image decode, quota, and transformation failures do not become silent null output |
@@ -129,10 +129,13 @@ const qr = new QRCodeStyling({
 ```
 
 `seamOverlap` accepts SVG-unit values from `0` through `0.5` and defaults to
-`0` for upstream-compatible output. It creates four tiny translated copies of
-the final painted layer for multi-shape clip paths and only when `roundSize` is
-explicitly `false`. The SVG dimensions, view box, and margin calculation are
-not changed.
+`0` for upstream-compatible output. It adds narrow bridge paths only where two
+dark data modules share a horizontal or vertical edge, and only when
+`roundSize` is explicitly `false`. Finder patterns and intentionally separate
+`dots` figures are left unchanged. When a logo hides background modules, its
+rendered bounds and configured margin are excluded from adjacency checks. The
+SVG dimensions, outer contours, view box, and margin calculation are not
+changed.
 
 Generated geometry is also normalized to at most six decimal places, turning
 binary floating-point artifacts such as `194.55999999999997` into `194.56`.
