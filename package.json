@@ -1,7 +1,7 @@
 {
   "name": "qr-code-styling-worker",
   "version": "0.2.1",
-  "description": "Cloudflare Workers runtime adapters for qr-code-styling",
+  "description": "Seam-free QR SVG renderer with a qr-code-styling compatible API for browsers and Cloudflare Workers",
   "type": "module",
   "license": "MIT",
   "author": "jiayx",
@@ -39,23 +39,27 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "prepare": "tsc -p tsconfig.build.json",
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
+    "prepare": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "oxlint src test examples scripts --deny-warnings --deny typescript/no-floating-promises",
     "test": "vitest run",
+    "test:browser": "pnpm build && node scripts/browser-regression.mjs",
     "pack:check": "npm pack --dry-run --ignore-scripts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm pack:check"
   },
   "dependencies": {
-    "linkedom": "0.18.13",
-    "qr-code-styling": "1.9.2"
+    "qr": "0.6.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.18.8",
     "@cloudflare/workers-types": "5.20260726.1",
     "@types/node": "24.10.4",
+    "esbuild": "^0.28.1",
+    "linkedom": "0.18.13",
     "oxlint": "1.75.0",
+    "playwright": "^1.62.1",
+    "sharp": "^0.35.3",
     "typescript": "7.0.2",
     "vitest": "4.1.10",
     "wrangler": "4.114.0"

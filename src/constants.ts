@@ -4,12 +4,25 @@ import type {
   DotType,
   DrawType,
   ErrorCorrectionLevel,
+  FinderCenterShape,
+  FinderFrameShape,
   GradientType,
   Mode,
+  ModuleShape,
   ShapeType,
   TypeNumber,
-} from "qr-code-styling";
+} from "./types.js";
 
+export const moduleShapes = {
+  circle: "circle",
+  rounded: "rounded",
+  diagonalRounded: "diagonal-rounded",
+  diagonalExtraRounded: "diagonal-extra-rounded",
+  square: "square",
+  extraRounded: "extra-rounded",
+} as const satisfies Record<string, ModuleShape>;
+
+/** qr-code-styling-compatible names. Prefer moduleShapes in new code. */
 export const dotTypes = {
   dots: "dots",
   rounded: "rounded",
@@ -19,12 +32,27 @@ export const dotTypes = {
   extraRounded: "extra-rounded",
 } as const satisfies Record<string, DotType>;
 
+export const finderFrameShapes = {
+  circle: "circle",
+  square: "square",
+  rounded: "rounded",
+  extraRounded: "extra-rounded",
+} as const satisfies Record<string, FinderFrameShape>;
+
+/** qr-code-styling-compatible names. Prefer finderFrameShapes in new code. */
 export const cornerSquareTypes = {
   dot: "dot",
   square: "square",
   extraRounded: "extra-rounded",
 } as const satisfies Record<string, CornerSquareType>;
 
+export const finderCenterShapes = {
+  circle: "circle",
+  square: "square",
+  rounded: "rounded",
+} as const satisfies Record<string, FinderCenterShape>;
+
+/** qr-code-styling-compatible names. Prefer finderCenterShapes in new code. */
 export const cornerDotTypes = {
   dot: "dot",
   square: "square",

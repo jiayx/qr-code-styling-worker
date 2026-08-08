@@ -34,7 +34,7 @@ describe("Cloudflare Images canvas adapter", () => {
     const qr = new QRCodeStyling({
       data: `raster-${extension}`,
       type: "canvas",
-      nodeCanvas: createCloudflareCanvas(images),
+      canvasAdapter: createCloudflareCanvas(images),
     });
 
     const blob = await qr.getRawData(extension);
@@ -55,7 +55,7 @@ describe("Cloudflare Images canvas adapter", () => {
     const qr = new QRCodeStyling({
       data: "failure",
       type: "canvas",
-      nodeCanvas: createCloudflareCanvas(failingImages),
+      canvasAdapter: createCloudflareCanvas(failingImages),
     });
 
     await expect(qr.getRawData("png")).rejects.toThrow(/quota exceeded/);

@@ -1,6 +1,11 @@
 import QRCodeStyling, {
   createCloudflareCanvas,
+  type CloudflareImagesBinding,
 } from "../../../src/index.js";
+
+interface Env {
+  IMAGES: CloudflareImagesBinding;
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -11,7 +16,7 @@ export default {
     const qr = new QRCodeStyling({
       data,
       type: extension === "svg" ? "svg" : "canvas",
-      nodeCanvas:
+      canvasAdapter:
         extension === "svg" ? undefined : createCloudflareCanvas(env.IMAGES),
       dotsOptions: { type: "rounded", color: "#111827" },
       cornersSquareOptions: { type: "extra-rounded", color: "#2563eb" },

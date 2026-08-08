@@ -1,8 +1,8 @@
+import { parseHTML } from "linkedom/worker";
 import { describe, expect, it, vi } from "vitest";
 import QRCodeStyling, {
   cornerDotTypes,
   cornerSquareTypes,
-  createWorkerJSDOM,
   dotTypes,
   gradientTypes,
   normalizeSvgNumericValue,
@@ -12,19 +12,24 @@ import QRCodeStyling, {
 const logo =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='12'%3E%3Crect width='20' height='12' fill='red'/%3E%3C/svg%3E";
 
+function getSvgDocument(svg: string): Document {
+  return parseHTML(svg).document as unknown as Document;
+}
+
 describe("SVG rendering in workerd", () => {
-  it("uses the upstream-compatible default constructor without browser globals", async () => {
+  it("uses compatible constructor defaults without browser globals", async () => {
     const qr = new QRCodeStyling({ data: "https://example.com" });
     const blob = await qr.getRawData("svg");
 
     expect(blob).toBeInstanceOf(Blob);
     expect(blob?.type).toBe("image/svg+xml");
-    expect(await blob?.text()).toContain(
-      '<svg xmlns="http://www.w3.org/2000/svg"',
+    const document = getSvgDocument(await blob?.text() ?? "");
+    expect(document.querySelector("svg")?.getAttribute("xmlns")).toBe(
+      "http://www.w3.org/2000/svg",
     );
   });
 
-  it("bridges adjacent modules without expanding the painted layer", async () => {
+  it("traces data modules as connected QR contours", async () => {
     const qr = new QRCodeStyling({
       data: "https://tools.tf",
       height: 320,
@@ -40,13 +45,71 @@ describe("SVG rendering in workerd", () => {
     const svg = await qr.getSvgString();
 
     expect(svg).toContain('data-qr-seam-overlap="0.2"');
-    expect(svg).toContain('data-qr-seam-bridge="vertical"');
-    expect(svg).toContain('data-qr-seam-bridge="horizontal"');
-    expect(svg).not.toContain("data-qr-seam-copy");
-    expect(svg).not.toContain("translate(-0.2 0)");
-    expect(svg).not.toContain('stroke-width="0.4"');
+    expect(svg).toContain('data-qr-contour-path="true"');
+    expect(svg).toContain('data-qr-contour-layer="true"');
+    expect(svg).not.toContain("data-qr-seam-bridge");
+    expect(svg).not.toContain("data-qr-seam-layer");
+    expect(svg).toContain('shape-rendering="geometricPrecision"');
+    expect(svg).not.toContain('shape-rendering="crispEdges"');
     expect(svg).toContain('viewBox="0 0 320 320"');
     expect(svg).not.toMatch(/\d+\.\d{7,}/);
+    const document = getSvgDocument(svg);
+    expect(document.querySelector('clipPath[id^="clip-path-dot-color-"]')).toBeNull();
+    expect(document.querySelector('[data-qr-contour-layer="true"]')?.tagName.toLowerCase())
+      .toBe("path");
+  });
+
+  it("keeps the representative contour SVG compact", async () => {
+    const qr = new QRCodeStyling({
+      data: "https://tools.tf",
+      width: 320,
+      height: 320,
+      margin: 48,
+      dotsOptions: {
+        type: "extra-rounded",
+        gradient: {
+          type: "linear",
+          colorStops: [
+            { offset: 0, color: "#65a30d" },
+            { offset: 1, color: "#365314" },
+          ],
+        },
+      },
+      cornersSquareOptions: { type: "extra-rounded" },
+      cornersDotOptions: { type: "square" },
+      type: "svg",
+    });
+    const svg = await qr.getSvgString();
+    const document = getSvgDocument(svg);
+
+    expect(svg.length).toBeLessThan(20_000);
+    expect(document.querySelectorAll("path").length).toBeLessThanOrEqual(4);
+    expect(document.querySelectorAll("clipPath")).toHaveLength(0);
+  });
+
+  it("renders every compatible data-dot family", async () => {
+    for (const type of Object.values(dotTypes)) {
+      const qr = new QRCodeStyling({
+        data: `compound-${type}`,
+        dotsOptions: { roundSize: false, type },
+        svgOptions: { seamOverlap: 0.2 },
+        type: "svg",
+      });
+      const document = getSvgDocument(await qr.getSvgString());
+      if (type === "dots") {
+        expect(document.querySelector('[data-qr-dot-path="true"]'), type)
+          .not.toBeNull();
+        expect(document.querySelectorAll('[data-qr-dot-path="true"]'), type)
+          .toHaveLength(1);
+        expect(document.querySelector('[data-qr-contour-path="true"]'), type)
+          .toBeNull();
+      } else {
+        expect(document.querySelector('clipPath[id^="clip-path-dot-color-"]'), type)
+          .toBeNull();
+        expect(document.querySelector('[data-qr-contour-path="true"]'), type)
+          .not.toBeNull();
+      }
+    }
   });
 
   it("normalizes SVG geometry without touching path commands", () => {
@@ -68,17 +131,39 @@ describe("SVG rendering in workerd", () => {
     expect(await qr.getSvgString()).not.toContain("data-qr-seam-overlap");
   });
 
-  it("does not connect intentionally separate dots", async () => {
+  it("floors module offsets when roundSize is enabled", async () => {
+    const qr = new QRCodeStyling({
+      data: "offset",
+      width: 301,
+      height: 303,
+      qrOptions: { typeNumber: 1 },
+      dotsOptions: { roundSize: true },
+      cornersSquareOptions: { type: "square" },
+      type: "svg",
+    });
+    const document = getSvgDocument(await qr.getSvgString());
+    const paths = document.querySelectorAll('[data-qr-layer="true"] > path');
+
+    expect(paths[1]?.getAttribute("d")).toMatch(/^M 3 4 H /);
+  });
+
+  it("combines intentionally separate dots into one compound path", async () => {
     const dots = new QRCodeStyling({
       data: "separate-dots",
       dotsOptions: { roundSize: false, type: "dots" },
       svgOptions: { seamOverlap: 0.2 },
       type: "svg",
     });
-    expect(await dots.getSvgString()).not.toContain("data-qr-seam-bridge");
+    const svg = await dots.getSvgString();
+    expect(svg).not.toContain("data-qr-seam-bridge");
+    expect(svg).not.toContain('data-qr-contour-path="true"');
+    expect(svg).toContain('data-qr-dot-path="true"');
+    expect(getSvgDocument(svg).querySelectorAll('[data-qr-dot-path="true"]'))
+      .toHaveLength(1);
+    expect(svg).not.toContain("<clipPath");
   });
 
-  it("bridges visible modules around an embedded logo", async () => {
+  it("preserves hidden modules around an embedded logo", async () => {
     const qr = new QRCodeStyling({
       data: "logo-safe",
       dotsOptions: { roundSize: false, type: "rounded" },
@@ -90,8 +175,8 @@ describe("SVG rendering in workerd", () => {
     const svg = await qr.getSvgString();
 
     expect(svg).toContain("<image");
-    expect(svg).toContain('data-qr-seam-bridge="vertical"');
-    expect(svg).toContain('data-qr-seam-bridge="horizontal"');
+    expect(svg).toContain('data-qr-contour-path="true"');
+    expect(svg).not.toContain("data-qr-seam-bridge");
   });
 
   it("validates and updates seam overlap", async () => {
@@ -113,7 +198,7 @@ describe("SVG rendering in workerd", () => {
     );
   });
 
-  it("supports every upstream figure family, gradients, image, shape and update", async () => {
+  it("supports every figure family, gradients, image, shape and update", async () => {
     const qr = new QRCodeStyling({
       data: "all-options",
       image: logo,
@@ -142,7 +227,94 @@ describe("SVG rendering in workerd", () => {
     expect(svg).toContain("<radialGradient");
     expect(svg).toContain("<image");
     expect(svg).toContain('width="420"');
-    expect(svg).toContain("<clipPath");
+    expect(svg).not.toContain("<clipPath");
+    const circleDecorationCount = getSvgDocument(svg)
+      .querySelector('[data-qr-layer="true"]')
+      ?.getAttribute("data-qr-circle-decoration-count");
+    expect(Number(circleDecorationCount)).toBeGreaterThan(0);
+  });
+
+  it("omits unused definitions and xlink namespaces", async () => {
+    const plain = new QRCodeStyling({
+      data: "plain-solid-svg",
+      type: "svg",
+    });
+    const svg = await plain.getSvgString();
+
+    expect(svg).not.toContain("<defs");
+    expect(svg).not.toContain("xmlns:xlink");
+  });
+
+  it("clears a gradient when update explicitly passes undefined", async () => {
+    const qr = new QRCodeStyling({
+      data: "gradient-update",
+      dotsOptions: {
+        gradient: {
+          type: "linear",
+          colorStops: [
+            { offset: 0, color: "#000000" },
+            { offset: 1, color: "#ffffff" },
+          ],
+        },
+      },
+      type: "svg",
+    });
+    expect(await qr.getSvgString()).toContain("<linearGradient");
+
+    qr.update({ dotsOptions: { gradient: undefined } });
+    expect(await qr.getSvgString()).not.toContain("<linearGradient");
+  });
+
+  it("matches compatible gradient coordinates and finder rotations", async () => {
+    const qr = new QRCodeStyling({
+      data: "gradient-geometry",
+      width: 320,
+      height: 240,
+      dotsOptions: {
+        gradient: {
+          type: "linear",
+          rotation: 0,
+          colorStops: [
+            { offset: 0, color: "#000000" },
+            { offset: 1, color: "#ffffff" },
+          ],
+        },
+      },
+      cornersSquareOptions: { type: "rounded" },
+      type: "svg",
+    });
+    const document = getSvgDocument(await qr.getSvgString());
+    const gradient = document.querySelector('linearGradient[id^="dots-"]');
+    const finderPaths = document.querySelectorAll('[data-qr-layer="true"] > path');
+
+    expect(gradient?.getAttribute("x1")).toBe("0");
+    expect(gradient?.getAttribute("y1")).toBe("120");
+    expect(gradient?.getAttribute("x2")).toBe("320");
+    expect(gradient?.getAttribute("y2")).toBe("120");
+    expect(finderPaths[1]?.getAttribute("transform")).toBeNull();
+    expect(finderPaths[2]?.getAttribute("transform")).toMatch(/^rotate\(90,/);
+    expect(finderPaths[3]?.getAttribute("transform")).toMatch(/^rotate\(-90,/);
+  });
+
+  it("lets an explicit finder color override the data gradient", async () => {
+    const qr = new QRCodeStyling({
+      data: "finder-color",
+      dotsOptions: {
+        gradient: {
+          type: "linear",
+          colorStops: [
+            { offset: 0, color: "#000000" },
+            { offset: 1, color: "#ffffff" },
+          ],
+        },
+      },
+      cornersSquareOptions: { color: "#ff0000" },
+      type: "svg",
+    });
+    const document = getSvgDocument(await qr.getSvgString());
+    const finderPaths = document.querySelectorAll('[data-qr-layer="true"] > path');
+
+    expect(finderPaths[1]?.getAttribute("fill")).toBe("#ff0000");
   });
 
   it("keeps the extension hook usable with the Worker DOM", async () => {
@@ -164,17 +336,16 @@ describe("SVG rendering in workerd", () => {
     expect(await qr.getSvgString()).not.toContain("worker-generated");
   });
 
-  it("fetches a remote logo once across Image and XHR paths", async () => {
+  it("fetches and embeds a remote logo once", async () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       new Response("<svg xmlns='http://www.w3.org/2000/svg' width='18' height='9'/>", {
         headers: { "content-type": "image/svg+xml" },
       }),
     );
-    const QRDOM = createWorkerJSDOM({ fetch: fetchMock });
     const qr = new QRCodeStyling({
       data: "remote-image",
       image: "https://assets.example/logo.svg",
-      jsdom: QRDOM,
+      resourceOptions: { fetch: fetchMock },
       type: "svg",
     });
 
@@ -182,18 +353,78 @@ describe("SVG rendering in workerd", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("surfaces image failures instead of hanging", async () => {
-    const QRDOM = createWorkerJSDOM({
-      fetch: async () => new Response("missing", { status: 404 }),
+  it("preserves a remote logo URL when saveAsBlob is disabled", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      new Response("<svg xmlns='http://www.w3.org/2000/svg' width='18' height='9'/>", {
+        headers: { "content-type": "image/svg+xml" },
+      }),
+    );
+    const source = "https://assets.example/logo.svg";
+    const qr = new QRCodeStyling({
+      data: "remote-image-reference",
+      image: source,
+      imageOptions: { saveAsBlob: false },
+      resourceOptions: { fetch: fetchMock },
+      type: "svg",
     });
+    const document = getSvgDocument(await qr.getSvgString());
+
+    expect(document.querySelector("image")?.getAttribute("href")).toBe(source);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("centers a rounded background on a non-square canvas", async () => {
+    const qr = new QRCodeStyling({
+      data: "rounded-background",
+      width: 420,
+      height: 300,
+      backgroundOptions: { round: 0.5 },
+      type: "svg",
+    });
+    const background = getSvgDocument(await qr.getSvgString()).querySelector("svg > rect");
+
+    expect(background?.getAttribute("x")).toBe("60");
+    expect(background?.getAttribute("y")).toBe("0");
+    expect(background?.getAttribute("width")).toBe("300");
+    expect(background?.getAttribute("height")).toBe("300");
+    expect(background?.getAttribute("rx")).toBe("75");
+  });
+
+  it("validates gradients like the compatible API", () => {
+    expect(() => new QRCodeStyling({
+      data: "invalid-gradient",
+      dotsOptions: {
+        gradient: { type: "linear", colorStops: [] },
+      },
+    })).toThrow(/colorStops/);
+  });
+
+  it("surfaces image failures instead of hanging", async () => {
     const qr = new QRCodeStyling({
       data: "broken-image",
       image: "https://assets.example/missing.png",
-      jsdom: QRDOM,
+      resourceOptions: {
+        fetch: async () => new Response("missing", { status: 404 }),
+      },
       type: "svg",
     });
 
     await expect(qr.getRawData("svg")).rejects.toThrow(/404/);
+  });
+
+  it("accepts but ignores the deprecated jsdom option", async () => {
+    const qr = new QRCodeStyling({
+      data: "ignored-jsdom",
+      jsdom: class {
+        readonly window = {};
+        constructor() {
+          throw new Error("must not be constructed");
+        }
+      },
+      type: "svg",
+    });
+
+    expect(await qr.getSvgString()).toContain("<svg");
   });
 
   it("rejects raster output without a Cloudflare Images adapter", async () => {
@@ -203,10 +434,21 @@ describe("SVG rendering in workerd", () => {
     );
   });
 
-  it("exports runtime constants matching upstream option unions", () => {
-    expect(Object.values(dotTypes)).toContain("classy-rounded");
-    expect(Object.values(cornerSquareTypes)).toContain("extra-rounded");
-    expect(Object.values(cornerDotTypes)).toContain("dot");
+  it("exports runtime constants matching the public option unions", () => {
+    expect(Object.values(dotTypes)).toEqual([
+      "dots",
+      "rounded",
+      "classy",
+      "classy-rounded",
+      "square",
+      "extra-rounded",
+    ]);
+    expect(Object.values(cornerSquareTypes)).toEqual([
+      "dot",
+      "square",
+      "extra-rounded",
+    ]);
+    expect(Object.values(cornerDotTypes)).toEqual(["dot", "square"]);
     expect(Object.values(gradientTypes)).toEqual(["radial", "linear"]);
     expect(Object.values(shapeTypes)).toEqual(["square", "circle"]);
   });
