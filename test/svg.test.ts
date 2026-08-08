@@ -5,6 +5,7 @@ import QRCodeStyling, {
   createWorkerJSDOM,
   dotTypes,
   gradientTypes,
+  normalizeSvgNumericValue,
   shapeTypes,
 } from "../src/index.js";
 
@@ -18,7 +19,71 @@ describe("SVG rendering in workerd", () => {
 
     expect(blob).toBeInstanceOf(Blob);
     expect(blob?.type).toBe("image/svg+xml");
-    expect(await blob?.text()).toContain("<svg");
+    expect(await blob?.text()).toContain(
+      '<svg xmlns="http://www.w3.org/2000/svg"',
+    );
+  });
+
+  it("overlaps fractional clip paths without rounding module size", async () => {
+    const qr = new QRCodeStyling({
+      data: "https://tools.tf",
+      height: 320,
+      margin: 48,
+      svgOptions: { seamOverlap: 0.2 },
+      type: "svg",
+      width: 320,
+      dotsOptions: {
+        roundSize: false,
+        type: "extra-rounded",
+      },
+    });
+    const svg = await qr.getSvgString();
+
+    expect(svg).toContain('data-qr-seam-overlap="0.2"');
+    expect(svg.match(/data-qr-seam-copy=/g)).toHaveLength(4);
+    expect(svg).toContain('transform="translate(-0.2 0)"');
+    expect(svg).toContain('transform="translate(0 0.2)"');
+    expect(svg).not.toContain('stroke-width="0.4"');
+    expect(svg).toContain('viewBox="0 0 320 320"');
+    expect(svg).not.toMatch(/\d+\.\d{7,}/);
+  });
+
+  it("normalizes SVG geometry without touching path commands", () => {
+    expect(normalizeSvgNumericValue(
+      "rotate(90,194.55999999999997,33.28)",
+    )).toBe("rotate(90,194.56,33.28)");
+    expect(normalizeSvgNumericValue(
+      "M 188.79999999999998 0.00000001L -0.00000001 2",
+    )).toBe("M 188.8 0L 0 2");
+  });
+
+  it("does not add overlap when roundSize remains enabled", async () => {
+    const qr = new QRCodeStyling({
+      data: "integer-modules",
+      svgOptions: { seamOverlap: 0.2 },
+      type: "svg",
+    });
+
+    expect(await qr.getSvgString()).not.toContain("data-qr-seam-overlap");
+  });
+
+  it("validates and updates seam overlap", async () => {
+    expect(() => new QRCodeStyling({
+      data: "invalid-overlap",
+      svgOptions: { seamOverlap: 0.6 },
+    })).toThrow(/between 0 and 0.5/);
+
+    const qr = new QRCodeStyling({
+      data: "updated-overlap",
+      dotsOptions: { roundSize: false },
+      svgOptions: { seamOverlap: 0 },
+      type: "svg",
+    });
+    qr.update({ svgOptions: { seamOverlap: 0.1 } });
+
+    expect(await qr.getSvgString()).toContain(
+      'data-qr-seam-overlap="0.1"',
+    );
   });
 
   it("supports every upstream figure family, gradients, image, shape and update", async () => {
@@ -68,6 +133,8 @@ describe("SVG rendering in workerd", () => {
     });
 
     expect(await qr.getSvgString()).toContain("<title>worker-generated</title>");
+    qr.deleteExtension();
+    expect(await qr.getSvgString()).not.toContain("worker-generated");
   });
 
   it("fetches a remote logo once across Image and XHR paths", async () => {

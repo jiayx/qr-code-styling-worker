@@ -1,6 +1,7 @@
 import BaseQRCodeStyling from "qr-code-styling";
 import type {
   DownloadOptions,
+  ExtensionFunction,
   FileExtension,
   Options,
 } from "qr-code-styling";
@@ -15,10 +16,16 @@ import {
   WorkerJSDOM,
   type WorkerJSDOMConstructor,
 } from "./worker-jsdom.js";
+import {
+  applySvgRenderingFixes,
+  normalizeSeamOverlap,
+  type SvgRenderingOptions,
+} from "./svg-rendering.js";
 
 export * from "./cloudflare-canvas.js";
 export * from "./constants.js";
 export * from "./image-resource-store.js";
+export * from "./svg-rendering.js";
 export * from "./worker-jsdom.js";
 export type {
   BasicFigureDrawArgs,
@@ -54,6 +61,7 @@ export type {
 export interface WorkerOptions extends Omit<Options, "jsdom" | "nodeCanvas"> {
   jsdom?: WorkerJSDOMConstructor;
   nodeCanvas?: WorkerCanvasModule;
+  svgOptions?: SvgRenderingOptions;
 }
 
 function shouldUseWorkerDOM(): boolean {
@@ -67,6 +75,7 @@ function toUpstreamOptions(
   if (!options && !injectDefaultDOM) return undefined;
 
   const adapted: Partial<WorkerOptions> = { ...options };
+  delete adapted.svgOptions;
   if (injectDefaultDOM && shouldUseWorkerDOM()) {
     if (!adapted.jsdom) adapted.jsdom = WorkerJSDOM;
     if (!adapted.nodeCanvas && adapted.type === "canvas") {
@@ -100,12 +109,22 @@ function getMimeType(extension: FileExtension): string {
 
 export default class QRCodeStyling extends BaseQRCodeStyling {
   #serverRuntime: boolean;
+  #seamOverlap: number;
+  #userExtension?: ExtensionFunction;
   #workerCanvas?: WorkerCanvasModule;
 
   constructor(options?: Partial<WorkerOptions>) {
     super(toUpstreamOptions(options, true));
     this.#serverRuntime = Boolean(options?.jsdom) || shouldUseWorkerDOM();
+    this.#seamOverlap = normalizeSeamOverlap(options?.svgOptions?.seamOverlap);
     this.#workerCanvas = options?.nodeCanvas;
+    this._extension = (svg, upstreamOptions) => {
+      const seamOverlap = upstreamOptions.dotsOptions?.roundSize === false
+        ? this.#seamOverlap
+        : 0;
+      applySvgRenderingFixes(svg, seamOverlap);
+      this.#userExtension?.(svg, upstreamOptions);
+    };
   }
 
   override update(options?: Partial<WorkerOptions>): void {
@@ -116,6 +135,11 @@ export default class QRCodeStyling extends BaseQRCodeStyling {
 
     clearWorkerRuntimeErrors(this._window);
     clearWorkerCanvasErrors(this.#workerCanvas);
+    if (options.svgOptions?.seamOverlap !== undefined) {
+      this.#seamOverlap = normalizeSeamOverlap(
+        options.svgOptions.seamOverlap,
+      );
+    }
     if (options.nodeCanvas) this.#workerCanvas = options.nodeCanvas;
     if (options.type === "canvas" && !this.#workerCanvas) {
       throw new Error(
@@ -123,6 +147,17 @@ export default class QRCodeStyling extends BaseQRCodeStyling {
       );
     }
     super.update(toUpstreamOptions(options, false));
+  }
+
+  override applyExtension(extension: ExtensionFunction): void {
+    if (!extension) throw new Error("Extension function must be defined");
+    this.#userExtension = extension;
+    super.update();
+  }
+
+  override deleteExtension(): void {
+    this.#userExtension = undefined;
+    super.update();
   }
 
   override async getRawData(extension: FileExtension = "png"): Promise<Blob | null> {
