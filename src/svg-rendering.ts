@@ -36,9 +36,9 @@ const NUMERIC_SVG_ATTRIBUTES = [
 
 export interface SvgRenderingOptions {
   /**
-   * Compatibility option retained from the Worker port. The independent
-   * contour renderer has no shared edges to overlap; a positive value is
-   * recorded on the contour for diagnostics and fallback consumers.
+   * Deprecated compatibility option retained from the Worker port. Values are
+   * validated but do not affect contour geometry.
+   * @deprecated The contour renderer does not need overlap patches.
    */
   seamOverlap?: number;
 }

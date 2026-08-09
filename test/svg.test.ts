@@ -44,7 +44,7 @@ describe("SVG rendering in workerd", () => {
     });
     const svg = await qr.getSvgString();
 
-    expect(svg).toContain('data-qr-seam-overlap="0.2"');
+    expect(svg).not.toContain("data-qr-seam-overlap");
     expect(svg).toContain('data-qr-contour-path="true"');
     expect(svg).toContain('data-qr-contour-layer="true"');
     expect(svg).not.toContain("data-qr-seam-bridge");
@@ -81,10 +81,12 @@ describe("SVG rendering in workerd", () => {
     });
     const svg = await qr.getSvgString();
     const document = getSvgDocument(svg);
+    const contour = document.querySelector('[data-qr-contour-path="true"]');
 
-    expect(svg.length).toBeLessThan(20_000);
+    expect(svg.length).toBeLessThan(10_000);
     expect(document.querySelectorAll("path").length).toBeLessThanOrEqual(4);
     expect(document.querySelectorAll("clipPath")).toHaveLength(0);
+    expect(contour?.getAttribute("d")).not.toContain(" L ");
   });
 
   it("renders every compatible data-dot family", async () => {
@@ -179,7 +181,7 @@ describe("SVG rendering in workerd", () => {
     expect(svg).not.toContain("data-qr-seam-bridge");
   });
 
-  it("validates and updates seam overlap", async () => {
+  it("validates but otherwise ignores seam overlap", async () => {
     expect(() => new QRCodeStyling({
       data: "invalid-overlap",
       svgOptions: { seamOverlap: 0.6 },
@@ -193,9 +195,7 @@ describe("SVG rendering in workerd", () => {
     });
     qr.update({ svgOptions: { seamOverlap: 0.1 } });
 
-    expect(await qr.getSvgString()).toContain(
-      'data-qr-seam-overlap="0.1"',
-    );
+    expect(await qr.getSvgString()).not.toContain("data-qr-seam-overlap");
   });
 
   it("supports every figure family, gradients, image, shape and update", async () => {
@@ -234,7 +234,7 @@ describe("SVG rendering in workerd", () => {
     expect(Number(circleDecorationCount)).toBeGreaterThan(0);
   });
 
-  it("omits unused definitions and xlink namespaces", async () => {
+  it("omits unused definitions and legacy xlink attributes", async () => {
     const plain = new QRCodeStyling({
       data: "plain-solid-svg",
       type: "svg",
@@ -243,6 +243,14 @@ describe("SVG rendering in workerd", () => {
 
     expect(svg).not.toContain("<defs");
     expect(svg).not.toContain("xmlns:xlink");
+
+    const withLogo = await new QRCodeStyling({
+      data: "single-logo-reference",
+      image: logo,
+      type: "svg",
+    }).getSvgString();
+    expect(withLogo.match(/data:image\/svg\+xml;base64,/g)).toHaveLength(1);
+    expect(withLogo).not.toContain("xlink:href");
   });
 
   it("clears a gradient when update explicitly passes undefined", async () => {
@@ -294,6 +302,28 @@ describe("SVG rendering in workerd", () => {
     expect(finderPaths[1]?.getAttribute("transform")).toBeNull();
     expect(finderPaths[2]?.getAttribute("transform")).toMatch(/^rotate\(90,/);
     expect(finderPaths[3]?.getAttribute("transform")).toMatch(/^rotate\(-90,/);
+
+    const angledDocument = getSvgDocument(await new QRCodeStyling({
+      data: "fractional-gradient-geometry",
+      width: 321,
+      height: 239,
+      dotsOptions: {
+        gradient: {
+          type: "linear",
+          rotation: 0.37,
+          colorStops: [
+            { offset: 0, color: "#000000" },
+            { offset: 1, color: "#ffffff" },
+          ],
+        },
+      },
+      type: "svg",
+    }).getSvgString());
+    const angled = angledDocument.querySelector('linearGradient[id^="dots-"]');
+    const coordinates = ["x1", "y1", "x2", "y2"]
+      .map((attribute) => angled?.getAttribute(attribute) ?? "");
+    expect(coordinates.some((coordinate) => coordinate.includes("."))).toBe(true);
+    expect(coordinates.join(" ")).not.toMatch(/\d+\.\d{7,}/);
   });
 
   it("lets an explicit finder color override the data gradient", async () => {

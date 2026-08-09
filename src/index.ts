@@ -164,7 +164,6 @@ export default class QRCodeStyling {
   #extension?: ExtensionFunction;
   #rasterRenderPromise?: Promise<void>;
   #svgRenderPromise?: Promise<void>;
-  #seamOverlap: number;
   #canvasAdapter?: WorkerCanvasModule;
   #imageStore: ImageResourceStore;
 
@@ -184,7 +183,7 @@ export default class QRCodeStyling {
       baseUrl,
     );
     this.#canvasAdapter = options?.canvasAdapter;
-    this.#seamOverlap = normalizeSeamOverlap(options?.svgOptions?.seamOverlap);
+    normalizeSeamOverlap(options?.svgOptions?.seamOverlap);
     this.#options = mergeOptions(
       undefined,
       stripRendererOptions(options),
@@ -274,7 +273,7 @@ export default class QRCodeStyling {
     QRCodeStyling.#clearContainer(this.#container);
     clearWorkerCanvasErrors(this.#canvasAdapter);
     if (options?.svgOptions?.seamOverlap !== undefined) {
-      this.#seamOverlap = normalizeSeamOverlap(options.svgOptions.seamOverlap);
+      normalizeSeamOverlap(options.svgOptions.seamOverlap);
     }
     if (options && Object.hasOwn(options, "canvasAdapter")) {
       this.#canvasAdapter = options.canvasAdapter;
@@ -439,7 +438,6 @@ export default class QRCodeStyling {
       this.#matrix,
       this.#options,
       this.#runtime,
-      this.#options.dotsOptions.roundSize ? 0 : this.#seamOverlap,
       this.#imageStore,
     ).then(() => {
       this.#extension?.(svg, this.#options);

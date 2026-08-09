@@ -17,7 +17,6 @@ export interface ContourOptions {
   count: number;
   isDrawn: (row: number, column: number) => boolean;
   moduleSize: number;
-  seamOverlap: number;
   type: string;
   xOffset: number;
   yOffset: number;
@@ -116,7 +115,7 @@ function appendCorner(
   options: ContourOptions,
 ): GridPoint {
   if (!samePoint(current, corner.entry)) {
-    commands.push(`L ${svgPoint(corner.entry, options)}`);
+    appendLine(commands, current, corner.entry, options);
   }
   if (corner.radius > 0) {
     const radius = corner.radius * options.moduleSize;
@@ -125,6 +124,21 @@ function appendCorner(
     );
   }
   return corner.exit;
+}
+
+function appendLine(
+  commands: string[],
+  current: GridPoint,
+  target: GridPoint,
+  options: ContourOptions,
+): void {
+  if (current.y === target.y) {
+    commands.push(`H ${svgX(target.x, options)}`);
+  } else if (current.x === target.x) {
+    commands.push(`V ${svgY(target.y, options)}`);
+  } else {
+    commands.push(`L ${svgPoint(target, options)}`);
+  }
 }
 
 function buildCorner(
@@ -235,7 +249,15 @@ function turn(from: number, to: number): number {
 }
 
 function svgPoint(point: GridPoint, options: ContourOptions): string {
-  return `${formatSvgNumber(options.xOffset + point.x * options.moduleSize)} ${formatSvgNumber(options.yOffset + point.y * options.moduleSize)}`;
+  return `${svgX(point.x, options)} ${svgY(point.y, options)}`;
+}
+
+function svgX(x: number, options: ContourOptions): string {
+  return formatSvgNumber(options.xOffset + x * options.moduleSize);
+}
+
+function svgY(y: number, options: ContourOptions): string {
+  return formatSvgNumber(options.yOffset + y * options.moduleSize);
 }
 
 function pointKey(point: GridPoint): string {

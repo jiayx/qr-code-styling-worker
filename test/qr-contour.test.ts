@@ -16,7 +16,6 @@ function contourOptions(
     count: 20,
     isDrawn: (row, column) => drawn.has(`${row},${column}`),
     moduleSize,
-    seamOverlap: 0.2,
     type,
     xOffset: 0,
     yOffset: 0,
@@ -40,7 +39,7 @@ describe("QR-specific contour tracing", () => {
     const run = Array.from({ length: 12 }, (_, column) => ({ column, row: 0 }));
     const pathData = buildContourPath(run, contourOptions("square", run)) ?? "";
 
-    expect(pathData).toBe("M 0 0 L 120 0 L 120 10 L 0 10 Z");
+    expect(pathData).toBe("M 0 0 H 120 V 10 H 0 Z");
   });
 
   it.each([

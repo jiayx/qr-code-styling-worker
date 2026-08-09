@@ -182,13 +182,12 @@ export async function renderSvgString(
   const svg = createSvgRoot(runtime, resolved);
   const matrix = encodeMatrix(resolved.data, resolved.qrOptions);
   throwUnsafeQr(diagnoseQr(matrix, resolved));
-  const seamOverlap = normalizeSeamOverlap(svgOptions?.seamOverlap);
+  normalizeSeamOverlap(svgOptions?.seamOverlap);
   await renderSvg(
     svg,
     matrix,
     resolved,
     runtime,
-    resolved.dotsOptions.roundSize ? 0 : seamOverlap,
     store,
     stableRenderId(JSON.stringify(options)),
   );

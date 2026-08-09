@@ -15,7 +15,7 @@ Try it at [`qr.tools.tf`](https://qr.tools.tf/).
 - **Smaller SVG, less rasterization work.** Collinear edges are collapsed,
   circular modules are grouped, finder patterns use direct geometry, and
   optional definitions are emitted only when needed. One validation sample
-  shrank by 48%, from 31,483 to 16,312 bytes, with 4 paths instead of 116.
+  shrank by 72%, from 31,483 to 8,831 bytes, with 4 paths instead of 116.
 - **First-class Worker output.** Generate SVG directly with no binding, or use a
   Cloudflare Images binding for PNG, JPEG, and WebP.
 - **Controlled QR encoding.** Automatic Numeric, Alphanumeric, and UTF-8 Byte
@@ -59,9 +59,10 @@ SVG coordinates are formatted while geometry is generated. The exported
 `normalizeSvgCoordinates()` helper remains available for backward compatibility
 with callers that want to normalize extension-produced geometry; it only visits
 known geometry attributes and does not rewrite colors, IDs, URLs, or embedded
-image data. In the same 320 px validation sample, clip paths fell from 8 to 0.
-The size and element counts are illustrative rather than a guaranteed
-compression ratio; they vary with content and styling.
+image data. In the same 320 px validation sample, line segments use compact
+horizontal and vertical commands, and clip paths fell from 8 to 0. The size and
+element counts are illustrative rather than a guaranteed compression ratio;
+they vary with content and styling.
 
 ## Version history
 
@@ -71,6 +72,9 @@ compression ratio; they vary with content and styling.
 public class, encoding policy, rendering, serialization, logo handling,
 diagnostics, and export pipeline. Compatibility refers to the documented
 `qr-code-styling` API, not its internal DOM structure or implementation.
+
+`1.0.1` further compacts contour paths, avoids duplicate embedded-logo data,
+and preserves fractional linear-gradient coordinates.
 
 ### `0.2.1` and earlier
 
@@ -231,8 +235,8 @@ const qr = new QRCodeStyling({
 });
 ```
 
-`svgOptions.seamOverlap` remains accepted for compatibility and diagnostics,
-but the independent renderer does not use it to enlarge geometry. For every
+`svgOptions.seamOverlap` remains accepted and validated for compatibility, but
+is otherwise ignored. For every
 non-`circle` family, only exposed contour edges are emitted and rounding applies
 only to true outer corners. Intentionally separate `circle` modules remain visually
 separate but are serialized as subpaths of one compound path. Logo-hidden
@@ -400,6 +404,8 @@ requests and defaults to:
 remote image is fetched and embedded as a data URL. Set it to `false` to keep
 the original URL in the SVG; the image is still loaded once to calculate its
 layout. Browser requests remain subject to the remote server's CORS policy.
+Embedded images use the SVG `href` attribute once rather than duplicating the
+same payload in the legacy `xlink:href` attribute.
 
 Customize those controls:
 

@@ -15,7 +15,6 @@ import type {
 } from "./types.js";
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
-const XLINK_NAMESPACE = "http://www.w3.org/1999/xlink";
 const finderPattern = [
   [0, 0, 0],
   [1, 0, 1],
@@ -80,7 +79,6 @@ export async function renderSvg(
   qr: QrMatrix,
   options: ResolvedOptions,
   window: RuntimeWindow,
-  seamOverlap: number,
   imageStore?: ImageResourceStore,
   renderId?: number | string,
 ): Promise<void> {
@@ -171,7 +169,6 @@ export async function renderSvg(
       count,
       isDrawn,
       moduleSize,
-      seamOverlap,
       type: options.dotsOptions.type,
       xOffset,
       yOffset,
@@ -183,9 +180,6 @@ export async function renderSvg(
       path.setAttribute("fill-rule", "evenodd");
       path.setAttribute("data-qr-contour-path", "true");
       path.setAttribute("data-qr-contour-layer", "true");
-      if (seamOverlap > 0) {
-        path.setAttribute("data-qr-seam-overlap", n(seamOverlap));
-      }
       qrGroup.appendChild(path);
     }
   }
@@ -553,10 +547,10 @@ function createPaint(
       x2 -= bounds.width / 2 / Math.tan(rotation);
     }
 
-    element.setAttribute("x1", n(Math.round(x1)));
-    element.setAttribute("y1", n(Math.round(y1)));
-    element.setAttribute("x2", n(Math.round(x2)));
-    element.setAttribute("y2", n(Math.round(y2)));
+    element.setAttribute("x1", n(x1));
+    element.setAttribute("y1", n(y1));
+    element.setAttribute("x2", n(x2));
+    element.setAttribute("y2", n(y2));
   }
   for (const colorStop of gradient.colorStops) {
     const stop = svgElement(defs.ownerDocument, "stop");
@@ -691,9 +685,7 @@ function drawLogo(
   }
 
   const image = svgElement(svg.ownerDocument, "image");
-  svg.setAttribute("xmlns:xlink", XLINK_NAMESPACE);
   image.setAttribute("href", logo.href);
-  image.setAttribute("xlink:href", logo.href);
   image.setAttribute("x", n(logo.x));
   image.setAttribute("y", n(logo.y));
   image.setAttribute("width", n(logo.renderedWidth));
