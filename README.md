@@ -5,6 +5,80 @@ An independent QR encoder and seam-free SVG contour renderer with a
 API. It runs in browsers and Cloudflare Workers without depending on
 `qr-code-styling` or `qrcode-generator`.
 
+## Version lineage
+
+### `0.2.1` and earlier: compatibility port
+
+`0.2.1` is the final release of the original Worker port. That line subclasses
+`qr-code-styling@1.9.2`, uses its QR encoder and figure renderer, and provides
+Worker-safe DOM, image, canvas, error-propagation, SVG normalization, and seam
+bridge adapters around it. Its runtime dependencies include `qr-code-styling`
+and `linkedom`; `qrcode-generator` is used transitively by upstream.
+
+The port line is frozen. Existing applications that need its exact rendering
+behavior can pin it explicitly:
+
+```sh
+npm install qr-code-styling-worker@0.2.1
+```
+
+Its immutable source snapshot is tagged
+[`legacy-port-v0.2.1`](https://github.com/jiayx/qr-code-styling-worker/tree/legacy-port-v0.2.1).
+It will not receive the independent renderer introduced in `1.0.0`.
+
+### `1.0.0` and later: independent implementation
+
+Starting with `1.0.0`, the package runtime no longer subclasses, imports,
+bundles, or runs `qr-code-styling`, `qrcode-generator`, or `linkedom`. It owns
+the public class implementation, encoding policy, matrix adapter, QR-aware
+contour tracer, finder geometry, gradients, logos, SVG serialization,
+diagnostics, and browser/Worker export pipeline. The small zero-dependency
+[`qr`](https://github.com/paulmillr/qr) package supplies low-level QR
+primitives; this package controls segmentation, version fitting, mask
+selection, rendering, and output.
+
+Compatibility from `1.0.0` onward means source-level compatibility at the
+documented public API boundary, not shared implementation or identical SVG DOM
+structure. Legacy option and shape names are normalized before the independent
+renderer runs.
+
+Try the independent renderer in the production QR generator at
+[`qr.tools.tf`](https://qr.tools.tf/). It is a complete usage example covering
+live styling, gradients, finder customization, logos, SVG previews, and image
+downloads.
+
+| Area | `0.2.1` port | `1.0.0+` independent implementation |
+| --- | --- | --- |
+| Core class | Subclasses `qr-code-styling` | Own class with private state and compatible public methods |
+| QR encoding | Uses upstream `qrcode-generator` behavior | Automatic Numeric, Alphanumeric, and UTF-8 Byte segmentation, smallest-version fitting, and automatic or fixed mask selection |
+| Data modules | Upstream per-module figures and clip paths | QR-aware compound contours with shared edges removed before rasterization |
+| Seam handling | Adds narrow bridge paths after upstream rendering | Shared internal edges do not exist, so overlap patches are unnecessary |
+| Finder patterns | Inherits upstream figure generation | Dedicated direct ring and center geometry with independent paint |
+| Worker DOM | General-purpose `linkedom` adapter exposed as `WorkerJSDOM` | Small internal SVG tree and serializer used only for required operations |
+| Server SVG | Class rendering through the DOM adapter | Class API plus direct DOM-free `renderSvgString()` hot path |
+| Raster output | Upstream `nodeCanvas` injection adapted to Cloudflare Images | Explicit Worker-only `canvasAdapter`; SVG remains binding-free |
+| Images and logos | Adapter around upstream loading and sizing | Bounded, timed, deduplicated loading, metadata parsing, self-contained embedding, background, margin, opacity, and clipping |
+| Shape naming | Inherits ambiguous upstream names such as `dots`, `classy`, and `dot` | Canonical geometry names with isolated deprecated aliases |
+| Safety and metadata | No first-class layout diagnostics | Version, mask, segments, layout metadata, scan-safety diagnostics, and optional strict rejection |
+| Async control | Rendering starts implicitly | Compatible constructor plus awaitable rendering, callbacks, errors, cancellation, and `updateAsync()` |
+| Decoration | Upstream styling surface | Adds circle-shaped output, frames, captions, logo styling, and SVG accessibility metadata |
+| Verification | Workerd rendering tests | Migrated upstream cases, encoder/decode tests, contour topology tests, workerd tests, and Chromium/WebKit PNG download-and-decode regression |
+
+For most callers, construction and update code remains unchanged. Port users
+should review these intentional `1.0.0` boundaries:
+
+- Generated SVG paths, child ordering, and IDs are not byte-for-byte compatible;
+  extensions must not depend on undocumented upstream DOM internals.
+- The old `jsdom` option is accepted but ignored, and the exported
+  `WorkerJSDOM` adapter no longer exists.
+- The upstream `nodeCanvas` option is not supported. Worker raster output uses
+  the explicit `canvasAdapter` option with `createCloudflareCanvas(env.IMAGES)`.
+- `svgOptions.seamOverlap` remains accepted for source compatibility and
+  diagnostics, but no longer expands geometry because contours have no shared
+  internal edges.
+- Compact Kanji segments are not implemented; explicit `Kanji` mode falls back
+  to UTF-8 Byte encoding so the payload remains representable.
+
 ## Features
 
 - The same default export and `update`, `append`,
@@ -14,7 +88,8 @@ API. It runs in browsers and Cloudflare Workers without depending on
   gradients, square/circle shapes, embedded images, and SVG callbacks.
 - Canonical, shape-based enums (`moduleShapes`, `finderFrameShapes`, and
   `finderCenterShapes`) with deprecated upstream names isolated as aliases.
-- A maintained, zero-dependency QR encoder with a public matrix API.
+- A maintained encoding pipeline built on zero-dependency `qr` primitives,
+  with a public matrix API.
 - Automatic Numeric, Alphanumeric, and UTF-8 Byte segmentation, plus public
   version, mask, segment, and layout metadata.
 - Scan-safety diagnostics for quiet zone, module size, contrast, and estimated
@@ -38,12 +113,13 @@ API. It runs in browsers and Cloudflare Workers without depending on
 - Awaitable rendering with completion/error callbacks and `AbortSignal`.
 - Tested inside the actual `workerd` runtime.
 
-## Architecture and improvements
+## `1.0` architecture and optimization inventory
 
 The package retains the familiar class API but owns the complete rendering
-pipeline: text is encoded by [`qr`](https://github.com/paulmillr/qr), adapted to
-a small matrix interface, traced into QR-aware contours, and emitted directly
-as SVG. Canvas and Worker raster output consume that SVG.
+pipeline around [`qr`](https://github.com/paulmillr/qr): text is segmented and
+encoded into a small matrix interface, traced into QR-aware contours, and
+emitted directly as SVG. Canvas and Worker raster output consume that SVG. The
+table below is the complete optimization inventory for the independent line.
 
 | Area | Behavior | Benefit |
 | --- | --- | --- |
@@ -228,9 +304,6 @@ const qr = new QRCodeStyling({
   dotsOptions: {
     type: "extra-rounded",
     roundSize: false,
-  },
-  svgOptions: {
-    seamOverlap: 0.2,
   },
 });
 ```
