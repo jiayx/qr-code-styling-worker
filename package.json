@@ -1,6 +1,6 @@
 {
   "name": "qr-code-styling-worker",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "Seam-free QR SVG renderer with a qr-code-styling compatible API for browsers and Cloudflare Workers",
   "type": "module",
   "license": "MIT",
